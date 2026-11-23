@@ -88,7 +88,7 @@ export const TodoItem: React.FC<TodoItemProps> = ({
     let isActive = true;
     supabase
       .from("worker_task_payments")
-      .select("task_id, amount, tax_amount, currency_code, worker_currency_code, fx_rate, fx_rate_source, fx_rate_fetched_at, converted_amount, converted_tax_amount, payment_method, payment_reference, paid_at, confirmation_status, worker_acknowledged_at")
+      .select("task_id, amount, tax_amount, currency_code, payout_currency_code, fx_rate, fx_rate_source, fx_rate_fetched_at, converted_amount, converted_tax_amount, payment_method, payment_reference, paid_at, confirmation_status, worker_acknowledged_at")
       .eq("task_id", todo.task_id)
       .maybeSingle()
       .then(({ data }) => {
@@ -415,9 +415,9 @@ export const TodoItem: React.FC<TodoItemProps> = ({
             {payment.tax_amount > 0 && (
               <p className={payment.confirmation_status === "pending_confirmation" ? "text-amber-900 dark:text-amber-200" : "text-green-800 dark:text-green-300"}>VAT included: {payment.tax_amount.toLocaleString()} {payment.currency_code}</p>
             )}
-            {payment.worker_currency_code && payment.worker_currency_code !== payment.currency_code && payment.converted_amount !== null && payment.fx_rate !== null && (
+            {payment.payout_currency_code && payment.payout_currency_code !== payment.currency_code && payment.converted_amount !== null && payment.fx_rate !== null && (
               <p className={payment.confirmation_status === "pending_confirmation" ? "text-amber-900 dark:text-amber-200" : "text-green-800 dark:text-green-300"}>
-                Payout amount: {payment.converted_amount.toLocaleString()} {payment.worker_currency_code} at {payment.fx_rate.toLocaleString(undefined, { maximumFractionDigits: 6 })} per {payment.currency_code}
+                Payout amount: {payment.converted_amount.toLocaleString()} {payment.payout_currency_code} at {payment.fx_rate.toLocaleString(undefined, { maximumFractionDigits: 6 })} per {payment.currency_code}
               </p>
             )}
             <p className={payment.confirmation_status === "pending_confirmation" ? "text-amber-900 dark:text-amber-200" : "text-green-800 dark:text-green-300"}>Reference: {payment.payment_reference}</p>

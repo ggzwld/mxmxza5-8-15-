@@ -152,7 +152,7 @@ export interface WorkerTaskPayment {
   amount: number
   tax_amount: number
   currency_code: string
-  worker_currency_code: string | null
+  payout_currency_code: string | null
   fx_rate: number | null
   fx_rate_source: SettlementRateSource | null
   fx_rate_fetched_at: string | null
