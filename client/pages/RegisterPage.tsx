@@ -24,6 +24,7 @@ import { Switch } from "../components/ui/switch";
 import { Badge } from "../components/ui/badge";
 import { supabase } from "../lib/supabase";
 import { taxEntityTypes } from "../lib/booksTaxSummary";
+import { BOOKS_SUPPORTED_CURRENCIES } from "../lib/booksCurrency";
 
 const RegisterPage: React.FC = () => {
   const navigate = useNavigate();
@@ -41,6 +42,7 @@ const RegisterPage: React.FC = () => {
     // Worker Fields
     serviceType: "",
     serviceCategory: "" as "internal" | "external" | "",
+    booksBaseCurrency: "UGX",
     menuAccessRole: "none" as "none" | "chef" | "food_beverage_manager",
     // Personal Information
     organizationName: "",
@@ -181,6 +183,7 @@ const RegisterPage: React.FC = () => {
             last_name: formData.lastName,
             phone: formData.phone,
             role: formData.role,
+            books_base_currency: formData.role === "worker" ? formData.booksBaseCurrency : null,
             service_type: formData.serviceType || null,
             service_category: formData.serviceCategory || null,
             menu_access_role: formData.menuAccessRole || null,
@@ -214,6 +217,7 @@ const RegisterPage: React.FC = () => {
         email: formData.email,
         phone: formData.phone,
         role: formData.role,
+        books_base_currency: formData.role === "worker" ? formData.booksBaseCurrency : null,
       };
 
       // Only add worker fields if they selected that role
@@ -365,6 +369,19 @@ const RegisterPage: React.FC = () => {
       {formData.role === "worker" && (
         <div className="bg-sheraton-cream rounded-lg p-6 space-y-4">
           <h3 className="font-semibold text-sheraton-navy">Worker Details</h3>
+
+          <div className="space-y-2">
+            <label htmlFor="booksBaseCurrency" className="block text-sm font-medium">Books reporting currency</label>
+            <select
+              id="booksBaseCurrency"
+              value={formData.booksBaseCurrency}
+              onChange={(event) => setFormData((prev) => ({ ...prev, booksBaseCurrency: event.target.value }))}
+              className="w-full rounded-md border border-gray-300 px-3 py-2"
+            >
+              {BOOKS_SUPPORTED_CURRENCIES.map((currency) => <option key={currency} value={currency}>{currency}</option>)}
+            </select>
+            <p className="text-xs text-muted-foreground">Choose the currency for your Books workspace. This does not change the currency agreed for task payouts.</p>
+          </div>
 
           <div className="space-y-2">
             <label className="block text-sm font-medium">Service Type *</label>

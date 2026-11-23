@@ -12,6 +12,7 @@ import FullscreenMediaViewer, { type FullscreenMediaItem } from "../components/F
 import { useToast } from "../hooks/use-toast";
 import { useHotelTenant } from "../lib/hotelTenant";
 import { isWorkerRole } from "../lib/roles";
+import { BOOKS_SUPPORTED_CURRENCIES } from "../lib/booksCurrency";
 import BooksTaxSettings from "./BooksTaxSettings";
 import { calculateBooksTaxSummary, estimateIncomeTax, type IncomeTaxSchedule, type TaxEntityType } from "../lib/booksTaxSummary";
 import {
@@ -58,7 +59,7 @@ const instantFromLocalDateTime = (local: string, timezone: string) => {
 const formatDocumentDate = (date: string, at: string | null) => (at ? new Date(at).toLocaleString("en-GB", { timeZone: browserTimezone, day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) : new Date(`${date}T12:00:00`).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }));
 const formatExchangeTime = (instant: string) => new Date(instant).toLocaleString("en-GB", { timeZone: browserTimezone, day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", timeZoneName: "short" });
 const formatMoney = (value: number, currency: string) => new Intl.NumberFormat(undefined, { style: "currency", currency: currency.trim(), maximumFractionDigits: currency.trim() === "UGX" ? 0 : 2 }).format(value || 0);
-const supportedCurrencies = ["UGX", "USD", "EUR", "GBP", "KES", "TZS", "RWF"];
+const supportedCurrencies = BOOKS_SUPPORTED_CURRENCIES;
 
 const PaymentRate = ({ payment, exchange }: { payment: WorkerTaskPayment; exchange: FxConversion | undefined }) => {
   if (payment.fx_rate_source === "same_currency" || !payment.fx_rate) return <>Same currency</>;
@@ -120,14 +121,17 @@ const BooksPage = () => {
   const [organizationId, setOrganizationId] = useState<string | null>(null);
   const [organizationName, setOrganizationName] = useState("");
   const [isWorkerAccount, setIsWorkerAccount] = useState<boolean | null>(null);
+  const [isWorkerBooksWorkspace, setIsWorkerBooksWorkspace] = useState(false);
   const initializedTaxSettingsFor = useRef<string | null>(null);
   const [baseCurrency, setBaseCurrency] = useState("UGX");
+  const [workerBooksCurrencyLocked, setWorkerBooksCurrencyLocked] = useState(false);
+  const [savingWorkerCurrency, setSavingWorkerCurrency] = useState(false);
   const [vatRegistered, setVatRegistered] = useState(false);
   const requestedCurrency = searchParams.get("currency");
   const viewMode = searchParams.get("view");
   const isConsolidatedView = viewMode === "consolidated";
   const isUsdView = viewMode === "usd";
-  const [targetCurrency, setTargetCurrency] = useState(requestedCurrency && supportedCurrencies.includes(requestedCurrency) ? requestedCurrency : "USD");
+  const [targetCurrency, setTargetCurrency] = useState(requestedCurrency && supportedCurrencies.some((code) => code === requestedCurrency) ? requestedCurrency : "USD");
   const [fxRates, setFxRates] = useState<Record<string, number>>({ UGX: 1 });
   const [fxAsOf, setFxAsOf] = useState<string | null>(null);
   const [fxProvider, setFxProvider] = useState<string | null>(null);
@@ -195,10 +199,19 @@ const BooksPage = () => {
         navigate(`/login?returnTo=${encodeURIComponent("/books")}`, { replace: true });
         return;
       }
+      const { data: currentProfile, error: currentProfileError } = await supabase.from("user_profiles").select("role").eq("user_id", userData.user.id).maybeSingle();
+      if (currentProfileError) throw currentProfileError;
+      const workerAccount = isWorkerRole(currentProfile?.role);
       let orgId: string | null = null;
       let orgError: { message: string } | null = null;
+      let workerBooksWorkspace = false;
       if (isPersonalWorkspace) {
         const result = await supabase.rpc("get_or_create_personal_books_organization");
+        orgId = result.data;
+        orgError = result.error;
+      } else if (workerAccount && !requestedOrganizationId) {
+        const result = await supabase.rpc("get_or_create_worker_books_organization");
+        workerBooksWorkspace = true;
         orgId = result.data;
         orgError = result.error;
       } else if (requestedOrganizationId || tenant?.organizationId) {
@@ -213,11 +226,10 @@ const BooksPage = () => {
         } else if (requestedOrganizationId) {
           throw new Error("You do not have access to this hotel’s Books workspace.");
         } else {
-          const { data: profile, error: profileError } = await supabase.from("user_profiles").select("role").eq("user_id", userData.user.id).maybeSingle();
-          if (profileError) throw profileError;
-          const result = profile?.role === "worker"
+          const result = workerAccount
             ? await supabase.rpc("get_or_create_worker_books_organization")
             : await supabase.rpc("get_or_create_personal_books_organization");
+          workerBooksWorkspace = workerAccount;
           orgId = result.data;
           orgError = result.error;
         }
@@ -232,6 +244,7 @@ const BooksPage = () => {
         return;
       }
       setOrganizationId(orgId);
+      setIsWorkerBooksWorkspace(workerBooksWorkspace);
       const [org, contactResult, invoiceResult, expenseResult, accountResult, taxResult, incomeTaxResult, transactionResult, loyaltyPostingResult] = await Promise.all([
         supabase.from("books_organizations").select("name,base_currency,tax_country_code,tax_entity_type,vat_registered").eq("id", orgId).single(),
         supabase.from("books_contacts").select("id,name,type,email,tax_id").eq("organization_id", orgId).order("name"),
@@ -253,6 +266,7 @@ const BooksPage = () => {
       setOrganizationName(org.data?.name || "");
       if (org.data?.base_currency) setBaseCurrency(org.data.base_currency.trim());
       setVatRegistered(org.data?.vat_registered === true);
+      setWorkerBooksCurrencyLocked(workerBooksWorkspace && (transactionResult.data || []).length > 0);
       setFxConversionForm((current) => ({ ...current, exchange_at: current.exchange_at || localDateTimeInZone(new Date(), browserTimezone) }));
       const nextTaxProfile = { country_code: org.data?.tax_country_code?.trim() || "UG", tax_entity_type: org.data?.tax_entity_type || null } as OrganizationTaxProfile;
       setOrganizationTaxProfile(nextTaxProfile);
@@ -619,6 +633,18 @@ const BooksPage = () => {
     await loadBooks();
   };
 
+  const saveWorkerBooksCurrency = async (nextCurrency: string) => {
+    setSavingWorkerCurrency(true);
+    const { data, error } = await supabase.rpc("set_worker_books_base_currency", { p_currency: nextCurrency });
+    setSavingWorkerCurrency(false);
+    if (error) {
+      toast({ title: "Could not update Books currency", description: error.message, variant: "destructive" });
+      return;
+    }
+    setBaseCurrency(String(data).trim());
+    toast({ title: "Books reporting currency updated", description: "Task payout currencies are unchanged." });
+  };
+
   const saveVatRegistration = async (nextVatRegistered: boolean) => {
     if (!organizationId) return;
     const operation: BooksOperation = "books.vatRegistration.save";
@@ -692,6 +718,7 @@ const BooksPage = () => {
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <TabsList className="grid h-auto w-full grid-cols-2 gap-1 md:grid-cols-7"><TabsTrigger value="overview">Overview</TabsTrigger><TabsTrigger value="contacts">Contacts</TabsTrigger><TabsTrigger value="invoices">Invoices</TabsTrigger><TabsTrigger value="expenses">Expenses</TabsTrigger><TabsTrigger value="tax">Tax summary</TabsTrigger><TabsTrigger value="reports">Reports</TabsTrigger><TabsTrigger value="accounts">Chart of accounts</TabsTrigger></TabsList>
           <TabsContent value="overview" className="space-y-6">
+            {isWorkerBooksWorkspace && !isConsolidatedView && !isPersonalWorkspace && <Card><CardHeader><CardTitle>Books reporting currency</CardTitle><p className="text-sm text-muted-foreground">This sets your Books reporting currency only. It does not change the currency agreed for task payouts.</p></CardHeader><CardContent className="space-y-2"><Label htmlFor="worker-books-base-currency">Reporting currency</Label><select id="worker-books-base-currency" className="flex h-10 w-full max-w-xs rounded-md border border-input bg-background px-3 text-sm" value={baseCurrency} disabled={workerBooksCurrencyLocked || savingWorkerCurrency} onChange={(event) => void saveWorkerBooksCurrency(event.target.value)}>{!BOOKS_SUPPORTED_CURRENCIES.includes(baseCurrency as typeof BOOKS_SUPPORTED_CURRENCIES[number]) && <option value={baseCurrency}>{baseCurrency} (current)</option>}{BOOKS_SUPPORTED_CURRENCIES.map((code) => <option key={code} value={code}>{code}</option>)}</select>{workerBooksCurrencyLocked ? <p className="text-xs text-muted-foreground">Currency is locked because your Books has recorded transactions.</p> : <p className="text-xs text-muted-foreground">You can change this until your first Books transaction is recorded.</p>}</CardContent></Card>}
             {isConsolidatedView ? <><div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4"><Metric label={`Income · ${targetCurrency}`} value={currencyTotalsError ? "Totals unavailable" : hasAllConversionRates ? formatMoney(convertTotal("income"), targetCurrency) : "Rates unavailable"} icon={<ArrowUpRight className="h-5 w-5" />} tone="green" /><Metric label={`Expenses · ${targetCurrency}`} value={currencyTotalsError ? "Totals unavailable" : hasAllConversionRates ? formatMoney(convertTotal("expenses"), targetCurrency) : "Rates unavailable"} icon={<ArrowDownToLine className="h-5 w-5" />} tone="red" /><Metric label={`Receivables · ${targetCurrency}`} value={currencyTotalsError ? "Totals unavailable" : hasAllConversionRates ? formatMoney(convertTotal("receivables"), targetCurrency) : "Rates unavailable"} icon={<CircleDollarSign className="h-5 w-5" />} tone="gold" /><Metric label={`Net result · ${targetCurrency}`} value={currencyTotalsError ? "Totals unavailable" : hasAllConversionRates ? formatMoney(convertTotal("net_result"), targetCurrency) : "Rates unavailable"} icon={<BarChart3 className="h-5 w-5" />} tone="green" /></div><Card><CardHeader><CardTitle>Totals by source currency</CardTitle><p className="text-sm text-muted-foreground">Values are stored in their original currency. Converted totals use the latest available public reference rate and are informational estimates, not transaction rates or posted accounting values.</p></CardHeader><CardContent><DataTable headers={["Currency", "Invoices", "Tax + levies", "Expenses", "Net result", `Net in ${targetCurrency}`]}>{currencyTotals.map((row) => { const factor = fxFactor(row.currency_code); return <tr key={row.currency_code} className="border-b"><td className="p-4 font-semibold">{row.currency_code}</td><td className="p-4">{formatMoney(Number(row.invoice_total), row.currency_code)}</td><td className="p-4">{formatMoney(Number(row.tax_total), row.currency_code)}</td><td className="p-4">{formatMoney(Number(row.expenses), row.currency_code)}</td><td className="p-4">{formatMoney(Number(row.net_result), row.currency_code)}</td><td className="p-4">{factor === null ? "Rate unavailable" : formatMoney(Number(row.net_result) * factor, targetCurrency)}</td></tr>; })}</DataTable><div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">{([["Total invoices", "invoice_total"], ["Tax + levies", "tax_total"], ["Assets", "assets"], ["Liabilities", "liabilities"]] as const).map(([label, field]) => <div key={field} className="rounded-lg border p-3"><p className="text-xs text-muted-foreground">{label} · {targetCurrency}</p><p className="mt-1 font-semibold">{currencyTotalsError ? "Totals unavailable" : hasAllConversionRates ? formatMoney(convertTotal(field), targetCurrency) : "Rates unavailable"}</p></div>)}</div></CardContent></Card></> : <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4"><Metric label={`Income · ${currency}`} value={formatMoney(revenue, currency)} icon={<ArrowUpRight className="h-5 w-5" />} tone="green" /><Metric label={`Expenses · ${currency}`} value={formatMoney(expensesTotal, currency)} icon={<ArrowDownToLine className="h-5 w-5" />} tone="red" /><Metric label={`Receivables · ${currency}`} value={formatMoney(receivable, currency)} icon={<CircleDollarSign className="h-5 w-5" />} tone="gold" /><Metric label={`Net result · ${currency}`} value={formatMoney(profit, currency)} icon={<BarChart3 className="h-5 w-5" />} tone={profit >= 0 ? "green" : "red"} /></div>}
             <div className="grid gap-6 lg:grid-cols-[1.3fr_.7fr]"><Card><CardHeader><CardTitle>Get started</CardTitle></CardHeader><CardContent className="grid gap-3 sm:grid-cols-3"><QuickAction icon={<Users />} title="Add a contact" text="Customers and vendors" onClick={() => setActiveTab("contacts")} /><QuickAction icon={<FileText />} title="Create an invoice" text="Track money owed" onClick={() => setActiveTab("invoices")} /><QuickAction icon={<Receipt />} title="Record an expense" text="Keep costs current" onClick={() => setActiveTab("expenses")} /></CardContent></Card><Card><CardHeader><CardTitle>Attention needed</CardTitle></CardHeader><CardContent className="space-y-3 text-sm"><p>{overdue ? `${overdue} invoice${overdue === 1 ? "" : "s"} need follow-up.` : "No overdue invoices."}</p><p>{customerContacts.length} customer contacts and {vendorContacts.length} vendors are in your books.</p><Button variant="link" className="px-0" onClick={() => setActiveTab("reports")}>View financial reports →</Button></CardContent></Card></div>
             {loyaltyPostings.length > 0 && <Card><CardHeader><CardTitle>Rewards liability postings</CardTitle><p className="text-sm text-muted-foreground">Platform-funded loyalty accruals and reversals recorded in this Books organization.</p></CardHeader><CardContent><DataTable headers={["Posted date", "Amount (UGX)", "Status", "Journal"]}>{loyaltyPostings.map((posting) => <tr key={posting.ledger_entry_id} className="border-b"><td className="p-4">{new Date(posting.created_at).toLocaleDateString()}</td><td className="p-4">{formatMoney(Number(posting.amount_ugx), "UGX")}</td><td className="p-4"><Badge variant={posting.status === "posted" ? "default" : "outline"}>{posting.status}</Badge>{posting.status === "failed" && posting.error_message && <p className="mt-1 text-xs text-destructive">{posting.error_message}</p>}</td><td className="p-4 font-mono text-xs">{posting.journal_transaction_id || "Pending"}</td></tr>)}</DataTable></CardContent></Card>}
