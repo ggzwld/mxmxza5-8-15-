@@ -18,6 +18,9 @@ export const TASK_CURRENCIES = [
   { code: "SGD", label: "SGD — Singapore Dollar" },
 ];
 
+export const getSettlementCurrencies = (taskCurrency?: string | null) =>
+  TASK_CURRENCIES.filter(({ code }) => code === "UGX" || code === "USD" || code === taskCurrency);
+
 export const getTaskAmount = (task: {
   budget: number | string | null;
   final_amount: number | string | null;

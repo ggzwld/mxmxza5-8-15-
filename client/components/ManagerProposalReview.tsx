@@ -23,7 +23,7 @@ import { CheckCircle, XCircle, MessageCircle, Loader } from "lucide-react";
 import { supabase, Task, TaskProposal } from "../lib/supabase";
 import { toast } from "../hooks/use-toast";
 import { formatTaskDeadline, toDeadlineInstant } from "../lib/taskDeadline";
-import { formatTaskAmount, TASK_CURRENCIES } from "../lib/taskCurrency";
+import { formatTaskAmount, getSettlementCurrencies } from "../lib/taskCurrency";
 
 interface ManagerProposalReviewProps {
   proposal: TaskProposal | null;
@@ -191,14 +191,15 @@ export const ManagerProposalReview: React.FC<ManagerProposalReviewProps> = ({
               </div>
             )}
 
-            {proposal.proposed_settlement_currency_code && proposal.proposed_settlement_currency_code !== task?.currency_code && (
+            {proposal.proposed_settlement_currency_code && (
               <div className="p-4 bg-sheraton-cream rounded-lg border border-sheraton-gold/20">
                 <p className="text-xs font-semibold text-gray-500 uppercase mb-1">
-                  Settlement
+                  Paid in
                 </p>
                 <p className="text-lg font-semibold text-sheraton-navy">
                   {proposal.proposed_settlement_currency_code}
-                  {proposal.proposed_settlement_fx_rate
+                  {proposal.proposed_settlement_currency_code === task?.currency_code ? " (same as task)" : null}
+                  {proposal.proposed_settlement_currency_code !== task?.currency_code && proposal.proposed_settlement_fx_rate
                     ? ` at 1 ${task?.currency_code} = ${Number(proposal.proposed_settlement_fx_rate).toLocaleString(undefined, { maximumFractionDigits: 8 })}`
                     : ""}
                 </p>
@@ -404,7 +405,7 @@ export const ManagerProposalReview: React.FC<ManagerProposalReviewProps> = ({
 
                 <div>
                   <Label htmlFor="counter-settlement-currency" className="font-semibold">
-                    Settlement Currency (optional)
+                    Paid in (optional)
                   </Label>
                   <select
                     id="counter-settlement-currency"
@@ -413,7 +414,7 @@ export const ManagerProposalReview: React.FC<ManagerProposalReviewProps> = ({
                     className="w-full mt-2 px-3 py-2 border border-gray-300 rounded-md text-sm bg-white"
                   >
                     <option value="">Keep current</option>
-                    {TASK_CURRENCIES.map((currency) => (
+                    {getSettlementCurrencies(task?.currency_code).map((currency) => (
                       <option key={currency.code} value={currency.code}>
                         {currency.label}
                       </option>

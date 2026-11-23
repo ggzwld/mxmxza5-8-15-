@@ -417,7 +417,7 @@ export const TodoItem: React.FC<TodoItemProps> = ({
             )}
             {payment.worker_currency_code && payment.worker_currency_code !== payment.currency_code && payment.converted_amount !== null && payment.fx_rate !== null && (
               <p className={payment.confirmation_status === "pending_confirmation" ? "text-amber-900 dark:text-amber-200" : "text-green-800 dark:text-green-300"}>
-                {payment.confirmation_status === "pending_confirmation" ? "Worker Books amount after confirmation" : "In your Books"}: {payment.converted_amount.toLocaleString()} {payment.worker_currency_code} at {payment.fx_rate.toLocaleString(undefined, { maximumFractionDigits: 6 })} per {payment.currency_code}
+                Payout amount: {payment.converted_amount.toLocaleString()} {payment.worker_currency_code} at {payment.fx_rate.toLocaleString(undefined, { maximumFractionDigits: 6 })} per {payment.currency_code}
               </p>
             )}
             <p className={payment.confirmation_status === "pending_confirmation" ? "text-amber-900 dark:text-amber-200" : "text-green-800 dark:text-green-300"}>Reference: {payment.payment_reference}</p>

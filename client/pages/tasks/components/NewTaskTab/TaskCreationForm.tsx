@@ -22,7 +22,7 @@ import FileUploadZone, {
   FileAttachment,
 } from "../../../../components/FileUploadZone";
 import TaskCreationTipsSidebar from "./TaskCreationTipsSidebar";
-import { TASK_CURRENCIES } from "../../../../lib/taskCurrency";
+import { getSettlementCurrencies, TASK_CURRENCIES } from "../../../../lib/taskCurrency";
 import { supabase } from "../../../../lib/supabase";
 import { useHotelTenant } from "../../../../lib/hotelTenant";
 
@@ -405,7 +405,7 @@ const TaskCreationForm: React.FC<TaskCreationFormProps> = ({
             </div>
 
             <div className="space-y-2">
-              <Label>Settlement Currency</Label>
+              <Label>Paid in</Label>
               <Select
                 value={settlementCurrency}
                 onValueChange={(value) => onFormChange("settlementCurrency", value)}
@@ -415,9 +415,9 @@ const TaskCreationForm: React.FC<TaskCreationFormProps> = ({
                   <SelectValue placeholder="Select task currency first" />
                 </SelectTrigger>
                 <SelectContent>
-                  {TASK_CURRENCIES.map((currency) => (
+                  {getSettlementCurrencies(formData.currency).map((currency) => (
                     <SelectItem key={currency.code} value={currency.code}>
-                      {currency.label}
+                      {currency.code === formData.currency ? `Same as task (${currency.code})` : currency.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -472,7 +472,7 @@ const TaskCreationForm: React.FC<TaskCreationFormProps> = ({
                   <Input
                     type="number"
                     step="0.00000001"
-                    placeholder={`UGX per 1 ${formData.currency}`}
+                    placeholder={`${settlementCurrency} per 1 ${formData.currency}`}
                     value={formData.settlementCustomRate}
                     onChange={(e) => onFormChange("settlementCustomRate", e.target.value)}
                   />

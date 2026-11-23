@@ -120,6 +120,10 @@ const TaskPaymentPanel: React.FC<TaskPaymentPanelProps> = ({ task }) => {
             <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-900">
               Paid in {task.settlement_currency_code} at the agreed rate: 1 {task.currency_code} = {Number(task.settlement_fx_rate).toLocaleString(undefined, { maximumFractionDigits: 8 })} {task.settlement_currency_code}
             </div>
+          ) : task.currency_code ? (
+            <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-900">
+              Paid in {task.settlement_currency_code || task.currency_code}{!task.settlement_currency_code || task.settlement_currency_code === task.currency_code ? " (same as task)" : " (rate unavailable)"}
+            </div>
           ) : null}
           <div>
             <label htmlFor="worker-payment-reference" className="block text-sm font-medium text-gray-700 mb-1">
