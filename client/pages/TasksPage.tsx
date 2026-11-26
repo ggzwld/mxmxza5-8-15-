@@ -474,6 +474,7 @@ const TasksPage: React.FC = () => {
       ...prev,
       [field]: value,
       ...(field === "assignmentType" ? { assignee: "" } : {}),
+      ...(field === "currency" ? { settlementCurrency: "", settlementRateBasis: "live", settlementExchangeId: "", settlementCustomRate: "" } : {}),
     }));
   };
 

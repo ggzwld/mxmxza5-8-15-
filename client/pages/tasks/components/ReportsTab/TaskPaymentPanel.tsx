@@ -28,7 +28,7 @@ const TaskPaymentPanel: React.FC<TaskPaymentPanelProps> = ({ task }) => {
   const loadPayment = async () => {
     const { data, error } = await supabase
       .from("worker_task_payments")
-      .select("id, task_id, amount, tax_amount, currency_code, worker_currency_code, fx_rate, fx_rate_source, fx_rate_fetched_at, converted_amount, converted_tax_amount, payment_method, payment_reference, paid_at, confirmation_status, worker_acknowledged_at")
+      .select("id, task_id, amount, tax_amount, currency_code, payout_currency_code, fx_rate, fx_rate_source, fx_rate_fetched_at, converted_amount, converted_tax_amount, payment_method, payment_reference, paid_at, confirmation_status, worker_acknowledged_at")
       .eq("task_id", task.id)
       .maybeSingle();
     if (error) {
@@ -87,11 +87,11 @@ const TaskPaymentPanel: React.FC<TaskPaymentPanelProps> = ({ task }) => {
           {payment.tax_amount > 0 && (
             <p>VAT included: {payment.tax_amount.toLocaleString()} {payment.currency_code}</p>
           )}
-          {payment.worker_currency_code && payment.worker_currency_code !== payment.currency_code && payment.fx_rate !== null && payment.converted_amount !== null && (
+          {payment.payout_currency_code && payment.payout_currency_code !== payment.currency_code && payment.fx_rate !== null && payment.converted_amount !== null && (
             <div className="pt-1 border-t border-green-200 space-y-1">
-              <p>Payment to {task.assignee_name ?? "worker"}: {payment.converted_amount.toLocaleString()} {payment.worker_currency_code}</p>
+              <p>Payment to {task.assignee_name ?? "worker"}: {payment.converted_amount.toLocaleString()} {payment.payout_currency_code}</p>
               <p>
-                Exchange rate used: 1 {payment.currency_code} = {payment.fx_rate.toLocaleString(undefined, { maximumFractionDigits: 6 })} {payment.worker_currency_code}
+                Exchange rate used: 1 {payment.currency_code} = {payment.fx_rate.toLocaleString(undefined, { maximumFractionDigits: 6 })} {payment.payout_currency_code}
                 {payment.fx_rate_source === "manual" ? " (entered manually)" : payment.fx_rate_fetched_at ? ` (live on ${new Date(payment.fx_rate_fetched_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })})` : ""}
               </p>
             </div>
@@ -119,6 +119,10 @@ const TaskPaymentPanel: React.FC<TaskPaymentPanelProps> = ({ task }) => {
           {task.settlement_currency_code && task.settlement_currency_code !== task.currency_code && task.settlement_fx_rate ? (
             <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-900">
               Paid in {task.settlement_currency_code} at the agreed rate: 1 {task.currency_code} = {Number(task.settlement_fx_rate).toLocaleString(undefined, { maximumFractionDigits: 8 })} {task.settlement_currency_code}
+            </div>
+          ) : task.currency_code ? (
+            <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-900">
+              Paid in {task.settlement_currency_code || task.currency_code}{!task.settlement_currency_code || task.settlement_currency_code === task.currency_code ? " (same as task)" : " (rate unavailable)"}
             </div>
           ) : null}
           <div>

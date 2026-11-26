@@ -16,7 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Loader, CheckCircle, XCircle, MessageSquare } from "lucide-react";
 import { supabase, Task as TaskType } from "../lib/supabase";
 import { formatTaskDeadline } from "../lib/taskDeadline";
-import { formatTaskAmount, getTaskAmount, TASK_CURRENCIES } from "../lib/taskCurrency";
+import { formatTaskAmount, getTaskAmount, getSettlementCurrencies } from "../lib/taskCurrency";
 import DeadlineCountdown from "./DeadlineCountdown";
 import { toast } from "../hooks/use-toast";
 
@@ -389,7 +389,7 @@ export const TaskResponseModal: React.FC<TaskResponseModalProps> = ({
 
               <div>
                 <Label htmlFor="proposed-settlement-currency" className="font-semibold">
-                  Settlement Currency
+                  Paid in
                 </Label>
                 <select
                   id="proposed-settlement-currency"
@@ -398,9 +398,9 @@ export const TaskResponseModal: React.FC<TaskResponseModalProps> = ({
                   className="w-full mt-2 px-3 py-2 border border-gray-300 rounded-md text-sm bg-white"
                 >
                   <option value="">
-                    Same as task ({task.settlement_currency_code || task.currency_code})
+                    Keep current payout ({task.settlement_currency_code || task.currency_code})
                   </option>
-                  {TASK_CURRENCIES.map((currency) => (
+                  {getSettlementCurrencies(task.currency_code).map((currency) => (
                     <option key={currency.code} value={currency.code}>
                       {currency.label}
                     </option>

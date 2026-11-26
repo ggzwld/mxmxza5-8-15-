@@ -31,6 +31,24 @@ describe("calculateBooksTaxSummary", () => {
     expect(summary.invoiceIncome - summary.allowableDeductions).toBe(1164);
   });
 
+  it("keeps each tax summary limited to its selected source currency", () => {
+    const invoices = [
+      { issue_date: "2026-04-01", currency_code: "UGX", subtotal: 500, tax_amount: 0, status: "paid" as const },
+      { issue_date: "2026-04-02", currency_code: "USD", subtotal: 120, tax_amount: 0, status: "paid" as const },
+    ];
+    const expenses = [
+      { expense_date: "2026-04-03", currency_code: "UGX", amount: 80, tax_amount: 0, payment_status: "paid" as const, tax_treatment: "deductible" as const, vat_recoverable: false },
+      { expense_date: "2026-04-04", currency_code: "USD", amount: 20, tax_amount: 0, payment_status: "paid" as const, tax_treatment: "deductible" as const, vat_recoverable: false },
+    ];
+    const baseSummary = calculateBooksTaxSummary(invoices, expenses, "UGX", "2026-01-01", "2026-12-31");
+    const foreignSummary = calculateBooksTaxSummary(invoices, expenses, "USD", "2026-01-01", "2026-12-31");
+
+    expect(baseSummary.invoiceIncome).toBe(500);
+    expect(baseSummary.allowableDeductions).toBe(80);
+    expect(foreignSummary.invoiceIncome).toBe(120);
+    expect(foreignSummary.allowableDeductions).toBe(20);
+  });
+
   it("calculates only confirmed entity-specific effective schedules and treats losses as no current tax", () => {
     const schedule: IncomeTaxSchedule = {
       country_code: "UG",
